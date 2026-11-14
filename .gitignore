@@ -1,0 +1,10 @@
+# real credentials / config / logs — never commit
+kamoer_creds.json
+provisioner/kamoer_creds.json
+config.yaml
+bridge.log
+*.log
+# python
+__pycache__/
+*.pyc
+.venv/

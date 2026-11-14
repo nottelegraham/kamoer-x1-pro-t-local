@@ -1,0 +1,57 @@
+# HA package for Kamoer dosing schedules. Add to configuration.yaml under
+#   homeassistant:
+#     packages:
+#       kamoer_doser: !include packages/kamoer_doser.yaml
+# and drop this file in config/packages/. (Dosing by volume needs the bridge
+# calibration set, or Dose Now reports need-calibration.)
+
+input_number:
+  kamoer_daily_ml:
+    name: Kamoer daily volume
+    min: 0
+    max: 200
+    step: 0.5
+    unit_of_measurement: mL
+    icon: mdi:cup-water
+  kamoer_doses_per_day:
+    name: Kamoer doses per day
+    min: 1
+    max: 96
+    step: 1
+    icon: mdi:counter
+
+automation:
+  # Pattern A: spread the daily volume into equal micro-doses across 24 h.
+  - alias: Kamoer spread daily dose
+    mode: single
+    trigger:
+      - platform: time_pattern
+        minutes: "/30"          # every 30 min = 48 doses/day; match doses_per_day
+    condition:
+      - condition: numeric_state
+        entity_id: input_number.kamoer_daily_ml
+        above: 0
+    action:
+      - service: number.set_value
+        target: { entity_id: number.kamoer_x1_dose_ml }
+        data:
+          value: >
+            {{ (states('input_number.kamoer_daily_ml') | float)
+               / (states('input_number.kamoer_doses_per_day') | float) }}
+      - service: button.press
+        target: { entity_id: button.kamoer_x1_dose }
+
+  # Pattern B (example, disabled): continuous run across a window.
+  # - alias: Kamoer window start
+  #   trigger: { platform: time, at: "22:00:00" }
+  #   action:
+  #     - service: number.set_value
+  #       target: { entity_id: number.kamoer_x1_speed }
+  #       data: { value: 60 }
+  #     - service: switch.turn_on
+  #       target: { entity_id: switch.kamoer_x1_continuous }
+  # - alias: Kamoer window stop
+  #   trigger: { platform: time, at: "06:00:00" }
+  #   action:
+  #     - service: switch.turn_off
+  #       target: { entity_id: switch.kamoer_x1_continuous }

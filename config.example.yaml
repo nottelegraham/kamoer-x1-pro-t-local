@@ -1,0 +1,15 @@
+# Copy to config.yaml and fill in. config.yaml is gitignored.
+mqtt:
+  host: 127.0.0.1          # your HA Mosquitto broker (or homeassistant.local)
+  port: 1883
+  username: YOUR_MQTT_USER
+  password: "YOUR_MQTT_PASSWORD"
+
+pump:
+  host:                    # blank = auto-discover by MAC; or set the pump's IP
+  mac: 00:00:00:00:00:00   # your pump's MAC
+
+discovery_prefix: homeassistant
+default_speed_rpm: 200
+safety_max_run_seconds: 1800
+calibration_ml_per_min_at_350: 0
