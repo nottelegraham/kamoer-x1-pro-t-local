@@ -1,25 +1,31 @@
-# Lovelace card for the Kamoer X1 Pro-T. Dashboard -> Edit -> Add Card ->
-# Manual, then paste this. Entity IDs come from MQTT discovery.
-type: entities
-title: Kamoer X1 Pro-T Doser
-show_header_toggle: false
-entities:
-  - entity: sensor.kamoer_x1_status
-    name: Status
-  - entity: sensor.kamoer_x1_last_run
-    name: Last run
-  - type: divider
-  - entity: number.kamoer_x1_speed
-    name: Speed (RPM)
-  - entity: number.kamoer_x1_dose_ml
-    name: Dose volume (mL)
-  - entity: button.kamoer_x1_dose
-    name: Dose now
-  - type: divider
-  - entity: switch.kamoer_x1_continuous
-    name: Continuous run
-  - entity: button.kamoer_x1_stop
-    name: STOP
-  - type: divider
-  - entity: sensor.kamoer_x1_pump_ip
-    name: Pump IP
+# Kamoer X1 Pro-T doser — branded card. Requires x1-logo.png in HA's config/www/
+# (served at /local/x1-logo.png). Dashboard -> Edit -> Add Card -> Manual -> paste.
+type: vertical-stack
+cards:
+  - type: picture
+    image: /local/x1-logo.png
+    tap_action:
+      action: none
+  - type: entities
+    title: Sentinel X1 Pro-T
+    show_header_toggle: false
+    entities:
+      - entity: sensor.kamoer_x1_status
+        name: Status
+      - entity: sensor.kamoer_x1_last_run
+        name: Last run
+      - type: divider
+      - entity: number.kamoer_x1_speed
+        name: Speed (RPM)
+      - entity: number.kamoer_x1_dose_ml
+        name: Dose volume (mL)
+      - entity: button.kamoer_x1_dose
+        name: Dose now
+      - type: divider
+      - entity: switch.kamoer_x1_continuous
+        name: Continuous run
+      - entity: button.kamoer_x1_stop
+        name: STOP
+      - type: divider
+      - entity: sensor.kamoer_x1_pump_ip
+        name: Pump IP

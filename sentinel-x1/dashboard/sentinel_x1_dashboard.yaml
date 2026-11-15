@@ -1,0 +1,26 @@
+# Sentinel X1 dashboard: Settings > Dashboards > Add dashboard > New from scratch,
+# URL "sentinel-x1", then Edit > Raw configuration editor > paste this.
+# Needs the card resource: /local/sentinel-x1/sentinel-x1-card.js (JavaScript module).
+title: Sentinel X1
+views:
+  - title: Dosing
+    path: dosing
+    icon: sentinel:x1
+    type: panel
+    cards:
+      - type: custom:sentinel-x1-card
+        view: dosing
+  - title: Status
+    path: status
+    icon: mdi:shield-check
+    type: panel
+    cards:
+      - type: custom:sentinel-x1-card
+        view: status
+  - title: Settings
+    path: pump
+    icon: mdi:cog
+    type: panel
+    cards:
+      - type: custom:sentinel-x1-card
+        view: settings

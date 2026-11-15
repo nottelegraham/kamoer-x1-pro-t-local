@@ -1,15 +1,25 @@
-# Copy to config.yaml and fill in. config.yaml is gitignored.
+# Kamoer X1 Pro-T -> Home Assistant bridge. Copy to config.yaml and fill in.
 mqtt:
-  host: 127.0.0.1          # your HA Mosquitto broker (or homeassistant.local)
+  host: homeassistant.local   # your HA Mosquitto broker
   port: 1883
   username: YOUR_MQTT_USER
-  password: "YOUR_MQTT_PASSWORD"
+  password: YOUR_MQTT_PASSWORD
 
 pump:
-  host:                    # blank = auto-discover by MAC; or set the pump's IP
-  mac: 00:00:00:00:00:00   # your pump's MAC
+  host:                       # fixed pump IP for fast start (blank = auto-discover by MAC)
+  mac: xx:xx:xx:xx:xx:xx      # the pump's Wi-Fi MAC
 
 discovery_prefix: homeassistant
 default_speed_rpm: 200
-safety_max_run_seconds: 1800
+safety_max_run_seconds: 1800  # dead-man: any run auto-stops after this many seconds
+
+# Pulses (runs this short or shorter) start and stop on one LAN session.
+pulse_inline_max_seconds: 10
+# Overdose guard: a pulse that runs this many times its planned on-time, and at least
+# pulse_overrun_min_s longer, latches a fault that blocks every dose until cleared in HA.
+pulse_overrun_ratio: 1.5
+pulse_overrun_min_s: 0.2
+
+# Calibration is entered on the Sentinel X1 dashboard and saved by the bridge in
+# calibration.json. This value is only a first-run fallback.
 calibration_ml_per_min_at_350: 0

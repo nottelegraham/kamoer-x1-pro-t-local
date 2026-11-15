@@ -8,3 +8,7 @@ bridge.log
 __pycache__/
 *.pyc
 .venv/
+# secret-finder outputs
+secret-finder/kamoer_creds.json
+secret-finder/proxy_cert.pem
+secret-finder/proxy_key.pem

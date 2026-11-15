@@ -7,7 +7,7 @@ import os, sys, re, time, json, socket, struct, base64, hmac, hashlib, subproces
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 PORT = 5683
-DEFAULT_MAC = "00:00:00:00:00:00"
+DEFAULT_MAC = "xx:xx:xx:xx:xx:xx"   # set pump.mac in config.yaml
 MAX_SPEED = 350.0            # app-supported RPM ceiling; do not exceed
 RUN_VOLUME = 9999.0          # large volume = run until we STOP (duration-driven)
 
@@ -186,10 +186,10 @@ class Pump:
             except BaseException:
                 s.close()
                 raise
-    def _set(self, s, sid, key, raw):
+    def _set(self, s, sid, key, raw, timeout=10):
         obj = {'id': str(time.time_ns()), 'version': '1.0', 'method': 'thing.service.property.set',
                'params': {'PumpSerialNumber': raw}}
-        return _request(s, self.host, f"/sys/{self.creds['PK']}/{self.creds['DN']}/thing/service/property/set", obj, sid, key)
+        return _request(s, self.host, f"/sys/{self.creds['PK']}/{self.creds['DN']}/thing/service/property/set", obj, sid, key, timeout)
     @staticmethod
     def _ok(r): return isinstance(r, dict) and r.get('code') == 200
     def auth_test(self):
@@ -204,6 +204,56 @@ class Pump:
             self._set(s, sid, key, f_dose(nx(), 0, volume, speed))     # stop preflight
             return self._ok(self._set(s, sid, key, f_dose(nx(), 1, volume, speed)))  # START
         finally: s.close()
+    def pulse(self, speed, seconds, cancel=None):
+        """One short run on ONE LAN session: start, hold, stop.
+        dose() + stop() each open their own session, so a short pulse used to run
+        for its planned time PLUS a fresh auth handshake before the stop landed
+        (and a lost UDP reply there adds 3 s). Here the stop goes out on the
+        session that started the motor, timed from when START was sent.
+        Returns (started, stopped, info); info holds measured timings (s)."""
+        speed = max(1.0, min(MAX_SPEED, float(speed)))
+        info = {'planned_s': round(float(seconds), 3)}
+        s, sid, key = self._ses(); seq = time.time_ns() & 255
+        def nx():
+            nonlocal seq; seq = (seq + 1) & 255; return seq
+        started = stopped = False; t0 = None
+        try:
+            if not self._ok(self._set(s, sid, key, f_manual(nx()))): return False, True, info
+            self._set(s, sid, key, f_dose(nx(), 0, RUN_VOLUME, speed))       # stop preflight
+            t0 = time.monotonic()
+            started = self._ok(self._set(s, sid, key, f_dose(nx(), 1, RUN_VOLUME, speed), timeout=max(float(seconds), .3)))
+            info['start_ack_ms'] = round((time.monotonic() - t0) * 1000)
+            # Hold until the planned stop time. macOS coalesces timers for background
+            # (launchd) processes, so a plain sleep/wait can wake 100-200 ms late, which
+            # more than doubles a 0.13 s pulse. Sleep coarsely only until 0.5 s before
+            # the deadline, then spin on the monotonic clock for the last stretch.
+            deadline = t0 + float(seconds)
+            while True:
+                left = deadline - time.monotonic()
+                if left <= 0 or (cancel is not None and cancel.is_set()): break
+                if left > 0.5:
+                    if cancel is not None: cancel.wait(left - 0.5)
+                    else: time.sleep(left - 0.5)
+                else:
+                    time.sleep(0)            # yield, keep spinning
+        finally:
+            if t0 is not None:                       # START went out: always stop
+                ts = time.monotonic()
+                # A lost STOP keeps the motor running until the retry, so retry fast
+                # (LAN round trip is ~50 ms): up to 8 tries, 0.15 s apart.
+                tries = 0
+                for _ in range(8):
+                    tries += 1; ts = time.monotonic()   # on-time ends at the STOP that got through
+                    try:
+                        if self._ok(self._set(s, sid, key, f_dose(nx(), 0, RUN_VOLUME, speed), timeout=.15)):
+                            stopped = True; break
+                    except Exception:
+                        pass
+                info['stop_tries'] = tries
+                info['on_s'] = round(ts - t0, 3)     # START sent -> acknowledged STOP sent = motor on-time
+                info['stop_ack_ms'] = round((time.monotonic() - ts) * 1000)
+            s.close()
+        return started, stopped, info
     def stop(self):
         s, sid, key = self._ses(); seq = time.time_ns() & 255
         try:
