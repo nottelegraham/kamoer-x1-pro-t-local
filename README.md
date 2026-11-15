@@ -50,6 +50,6 @@ cloud-assisted pairing (so no manual secret capture) — see the doc's open item
 
 ## Credits & license
 See `ACKNOWLEDGEMENTS.md` (ffirenmatana's X2SR work; Alibaba iotkit-embedded).
-Licensed MIT — see `LICENSE`.
+Free for personal, hobby and other noncommercial use under the [PolyForm Noncommercial License 1.0.0](LICENSE). Selling this software, devices built with it, or any part of it requires written permission from TelegrahamTested.
 
 > Not affiliated with or endorsed by Kamoer or Alibaba. For use with hardware you own.
