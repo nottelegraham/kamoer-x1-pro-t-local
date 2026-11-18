@@ -23,7 +23,12 @@ your device's own key.
 3. `cp kamoer_creds.example.json kamoer_creds.json` and fill it in.
 4. `cp config.example.yaml config.yaml` and fill in MQTT + pump.
 5. Test:  `python3 kamoerx1.py --host <pump-ip> auth`  ->  `LAN auth OK`
-6. Run as a service:  `./install.sh`  (venv + launchd/systemd, auto-detected)
+6. Run it, either:
+   - **Inside Home Assistant (recommended):** install the `sentinel_kamoer_x1`
+     add-on — see `sentinel_kamoer_x1/DOCS.md`. Home Assistant starts it at boot
+     and restarts it if it stops working. Steps 3–4 are not needed; you enter the
+     keys in the add-on's Configuration tab.
+   - **On a Mac or Linux box:** `./install.sh` (venv + launchd/systemd, auto-detected)
 
 The Home Assistant device then appears automatically via MQTT discovery. Add the
 card in `homeassistant/dashboard-card.yaml` and the schedules in
@@ -34,7 +39,9 @@ card in `homeassistant/dashboard-card.yaml` and the schedules in
 |---|---|
 | `kamoerx1.py` | Self-contained LAN controller (auth, dose, stop, discovery) |
 | `kamoer_bridge.py` | MQTT <-> pump bridge for Home Assistant |
-| `install.sh` | OS-aware installer (venv + launchd/systemd) |
+| `sentinel_kamoer_x1/` | Home Assistant add-on (runs the bridge inside HA, watchdog restart) |
+| `install.sh` | OS-aware installer for running the bridge on a Mac/Linux box |
+| `scripts/sync-addon.sh` | Copies the bridge files into the add-on after you change them |
 | `provisioner/provision.py` | App-free WiFi setup (local web UI + CoAP) |
 | `homeassistant/` | Lovelace card + scheduler package |
 | `docs/METHOD_AND_REFERENCE.md` | Full method, protocol, and how to find the device secret |

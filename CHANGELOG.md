@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-11-17 — Home Assistant add-on
+
+### Add-on (`sentinel_kamoer_x1/`)
+- The bridge now runs as a Home Assistant add-on. Starts at boot; with Watchdog on, HA
+  restarts it if it crashes, MQTT is down 3 min, or the pump hasn't answered for 15 min.
+- Pump keys go in the add-on's Configuration tab; MQTT login comes from the Mosquitto add-on.
+
+### Bridge (`kamoer_bridge.py`)
+- A fixed pump IP is now only a starting hint: if it stops answering, the bridge finds the
+  pump again by MAC. (Before, a DHCP change left the bridge stuck on the old IP.)
+- Checks the pump every 60 s, so Status recovers from "offline" on its own.
+- Optional health endpoint (`KAMOER_HEALTH_PORT`) and `KAMOER_DATA` folder for config,
+  keys and calibration. Mac/Linux installs behave as before.
+
 ## 2026-11-15 — Sentinel X1 smart dosing + accuracy work
 
 ### Bridge (`kamoer_bridge.py`, `kamoerx1.py`)
