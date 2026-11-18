@@ -1,7 +1,7 @@
 # real credentials / config / logs — never commit
 kamoer_creds.json
 provisioner/kamoer_creds.json
-config.yaml
+/config.yaml
 bridge.log
 *.log
 # python
@@ -12,3 +12,6 @@ __pycache__/
 secret-finder/kamoer_creds.json
 secret-finder/proxy_cert.pem
 secret-finder/proxy_key.pem
+# add-on: real keys / calibration never committed
+sentinel_kamoer_x1/kamoer_creds.json
+sentinel_kamoer_x1/calibration.json

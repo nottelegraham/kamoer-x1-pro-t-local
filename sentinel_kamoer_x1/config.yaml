@@ -1,0 +1,49 @@
+name: Sentinel Kamoer X1 Bridge
+version: "1.1.0"
+slug: sentinel_kamoer_x1
+description: Local control of the Kamoer X1 Pro-T dosing pump. No cloud. Restarts itself if it stops working.
+url: https://github.com/nottelegraham/kamoer-x1-pro-t-local
+arch:
+  - aarch64
+  - amd64
+init: false
+startup: application
+boot: auto
+host_network: true
+services:
+  - mqtt:want
+map:
+  - share:ro
+ports:
+  8742/tcp: 8742
+ports_description:
+  8742/tcp: Health check (used by the watchdog)
+watchdog: "http://[HOST]:[PORT:8742]/health"
+options:
+  product_key: ""
+  device_name: ""
+  device_secret: ""
+  lan_prefix: ""
+  pump_host: ""
+  pump_mac: ""
+  mqtt_host: core-mosquitto
+  mqtt_port: 1883
+  mqtt_username: ""
+  mqtt_password: ""
+  default_speed_rpm: 200
+  safety_max_run_seconds: 1800
+  restart_if_pump_unreachable_minutes: 15
+schema:
+  product_key: str?
+  device_name: str?
+  device_secret: password?
+  lan_prefix: password?
+  pump_host: str?
+  pump_mac: str?
+  mqtt_host: str
+  mqtt_port: port
+  mqtt_username: str?
+  mqtt_password: password?
+  default_speed_rpm: int(1,350)
+  safety_max_run_seconds: int(10,7200)
+  restart_if_pump_unreachable_minutes: int(0,1440)

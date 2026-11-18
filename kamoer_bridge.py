@@ -11,14 +11,17 @@ import paho.mqtt.client as mqtt
 from kamoerx1 import Pump, discover, MAX_SPEED, DEFAULT_MAC
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-CFG = yaml.safe_load(open(os.path.join(HERE, 'config.yaml'))) or {}
-CREDS = json.load(open(os.path.join(HERE, 'kamoer_creds.json')))
+# Where config/creds/calibration live. The HA add-on sets KAMOER_DATA=/data
+# (persistent); on the Mac it stays the script folder.
+DATA = os.environ.get('KAMOER_DATA', HERE)
+CFG = yaml.safe_load(open(os.path.join(DATA, 'config.yaml'))) or {}
+CREDS = json.load(open(os.path.join(DATA, 'kamoer_creds.json')))
 
 DISC = CFG.get('discovery_prefix', 'homeassistant')
 NODE = 'kamoer_x1'
 BASE = 'kamoerx1'
 AVAIL = f'{BASE}/availability'
-CAL_FILE = os.path.join(HERE, 'calibration.json')
+CAL_FILE = os.path.join(DATA, 'calibration.json')
 # Three-point calibration set from Home Assistant (Sentinel X1 dashboard) and
 # saved here: measured mL/min at a low RPM, at 200 and at 350, plus a pulse
 # factor (delivered / expected) from a 50-pulse check. Flow at any speed is
@@ -61,12 +64,44 @@ _host = None
 
 def log(*a): print(time.strftime('%H:%M:%S'), *a, flush=True)
 
+# ---------- health (used by the HA add-on watchdog) ----------
+HEALTH_PORT = int(os.environ.get('KAMOER_HEALTH_PORT', '0') or 0)
+POLL_S = int(CFG.get('pump_poll_seconds', 60))
+MQTT_GRACE_S = int(CFG.get('health_mqtt_grace_seconds', 180))
+PUMP_GRACE_S = int(CFG.get('health_pump_grace_seconds', 900))
+health = {'mqtt_up': False, 'mqtt_change': time.time(), 'pump_ok': time.time()}
+
+def health_problem():
+    now = time.time()
+    if not health['mqtt_up'] and now - health['mqtt_change'] > MQTT_GRACE_S:
+        return 'MQTT down %ds' % (now - health['mqtt_change'])
+    if PUMP_GRACE_S and now - health['pump_ok'] > PUMP_GRACE_S:
+        return 'pump unreachable %ds' % (now - health['pump_ok'])
+    return None
+
+def start_health_server():
+    if not HEALTH_PORT:
+        return
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    class H(BaseHTTPRequestHandler):
+        def do_GET(self):
+            prob = health_problem()
+            body = json.dumps({'ok': not prob, 'problem': prob, 'status': state['status'],
+                               'pump_ip': state['pump_ip']}).encode()
+            self.send_response(503 if prob else 200)
+            self.send_header('Content-Type', 'application/json'); self.end_headers()
+            self.wfile.write(body)
+        def log_message(self, *a): pass
+    srv = ThreadingHTTPServer(('0.0.0.0', HEALTH_PORT), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    log('health endpoint on port', HEALTH_PORT)
+
 # ---------- pump resolution (auto-discover + cache + re-discover) ----------
 def resolve_host(force=False):
     global _host
     fixed = CFG.get('pump', {}).get('host')
-    if fixed:
-        _host = fixed; return _host
+    if fixed and not _host:
+        _host = fixed   # IP hint; if it stops answering we re-find the pump by MAC
     if _host and not force:
         return _host
     log('discovering pump by MAC', PUMP_MAC, '...')
@@ -239,9 +274,29 @@ def run_pulse(cli, speed, secs, label):
         state['last_run'] = label + (f" (on {info['on_s']:.3f}s)" if 'on_s' in info else ' (not started)')
         push(cli)
 
+# ---------- pump poll: keeps Status honest, self-heals a stale 'offline' ----------
+def poll_loop(cli):
+    while True:
+        time.sleep(POLL_S)
+        if state['status'] == 'running' or not _lock.acquire(blocking=False):
+            health['pump_ok'] = time.time() if state['status'] == 'running' else health['pump_ok']
+            continue
+        try:
+            try:
+                with_pump(lambda p: p.auth_test())
+                health['pump_ok'] = time.time(); state['pump_ip'] = _host or ''
+                if state['status'] in ('offline', 'starting'):
+                    log('pump reachable again at', _host); state['status'] = 'idle'; push(cli)
+            except Exception as e:
+                if state['status'] != 'offline':
+                    log('pump poll failed:', e); state['status'] = 'offline'; push(cli)
+        finally:
+            _lock.release()
+
 # ---------- MQTT ----------
 def on_connect(cli, u, f, rc, props=None):
     log('MQTT connected rc', rc)
+    health['mqtt_up'] = (rc == 0); health['mqtt_change'] = time.time()
     cli.publish(AVAIL, 'online', retain=True)
     publish_discovery(cli)
     for t in ('speed/set', 'dose_ml/set', 'dose/press', 'continuous/set', 'stop/press', 'clear_fault/press') + tuple(f'cal_{k}/set' for k in CAL_LIMITS):
@@ -252,6 +307,7 @@ def on_connect(cli, u, f, rc, props=None):
 
 def on_disconnect(cli, u, rc, props=None):
     log('MQTT disconnected rc', rc, '- auto-reconnecting')
+    if health['mqtt_up']: health['mqtt_up'] = False; health['mqtt_change'] = time.time()
 
 def on_message(cli, u, msg):
     p = msg.payload.decode('utf-8', 'ignore').strip(); t = msg.topic
@@ -310,6 +366,8 @@ def main():
         finally: cli.disconnect(); sys.exit(0)
     signal.signal(signal.SIGTERM, bye); signal.signal(signal.SIGINT, bye)
 
+    start_health_server()
+    threading.Thread(target=poll_loop, args=(cli,), daemon=True).start()
     host, port = m.get('host', 'homeassistant.local'), int(m.get('port', 1883))
     log(f'connecting to MQTT {host}:{port}; calibration points {cal_points()} pulse factor {CAL["pulse_factor"]}')
     while True:
